@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Cargo {
+  ALUNO
+  PROFESSOR
+  GESTAO
+  FUNDADOR
+}
+
+enum TipoNota {
+  ATIVIDADE
+  PARCIAL
+  BIMESTRAL
+}
+
+enum StatusMissao {
+  PENDENTE
+  ENVIADO
+  APROVADO
+  NEGADO
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  nome               String
+  matricula          String   @unique // ex: 0001-WALDEMAR
+  email              String   @unique
+  senhaHash          String
+  precisaTrocarSenha Boolean  @default(true)
+  totpSecret         String?
+  cargo              Cargo    @default(ALUNO)
+  xp                 Int      @default(0)
+  streak             Int      @default(0)
+  avatarUrl          String?
+  serie              Int? // 1 | 2 | 3, null para staff
+  turma              String?
+  ativo              Boolean  @default(true)
+  criadoEm           DateTime @default(now())
+
+  materiasLecionadas Materia[]          @relation("ProfessorMaterias")
+  boletins           BoletimOficial[]   @relation("AlunoBoletim")
+  notas              NotaDetalhada[]    @relation("AlunoNotas")
+  progresso          ProgressoMateria[] @relation("AlunoProgresso")
+  missoes            MissaoExtra[]      @relation("AlunoMissoes")
+  logs               LogSeguranca[]
+  historico          HistoricoFinal[]
+
+  @@index([serie, turma])
+}
+
+model Materia {
+  id            String  @id @default(cuid())
+  nome          String
+  codigo        String
+  serie         Int
+  professorId   String?
+  professor     User?   @relation("ProfessorMaterias", fields: [professorId], references: [id])
+  capPontoExtra Float   @default(1.0)
+  permiteExtra  Boolean @default(true)
+
+  boletins  BoletimOficial[]
+  notas     NotaDetalhada[]
+  progresso ProgressoMateria[]
+  missoes   MissaoExtra[]
+
+  @@unique([codigo, serie])
+  @@index([serie])
+}
+
+model BoletimOficial {
+  id           String   @id @default(cuid())
+  userId       String
+  aluno        User     @relation("AlunoBoletim", fields: [userId], references: [id])
+  materiaId    String
+  materia      Materia  @relation(fields: [materiaId], references: [id])
+  nota         Float
+  faltas       Int      @default(0)
+  totalAulas   Int      @default(0)
+  bimestre     Int
+  importadoPor String?
+  criadoEm     DateTime @default(now())
+
+  @@unique([userId, materiaId, bimestre])
+  @@index([userId])
+}
+
+model NotaDetalhada {
+  id        String   @id @default(cuid())
+  alunoId   String
+  aluno     User     @relation("AlunoNotas", fields: [alunoId], references: [id])
+  materiaId String
+  materia   Materia  @relation(fields: [materiaId], references: [id])
+  tipo      TipoNota
+  valor     Float
+  peso      Float    @default(1)
+  bimestre  Int
+  createdAt DateTime @default(now())
+
+  @@index([alunoId, materiaId, bimestre])
+}
+
+model ProgressoMateria {
+  id             String  @id @default(cuid())
+  alunoId        String
+  aluno          User    @relation("AlunoProgresso", fields: [alunoId], references: [id])
+  materiaId      String
+  materia        Materia @relation(fields: [materiaId], references: [id])
+  bimestre       Int
+  atividadeFeita Int     @default(0)
+  atividadeTotal Int     @default(0)
+  parcialFeita   Boolean @default(false)
+  bimestralFeita Boolean @default(false)
+  percentual     Int     @default(0) // atividade 40% + parcial 30% + bimestral 30%
+
+  @@unique([alunoId, materiaId, bimestre])
+  @@index([alunoId])
+}
+
+model MissaoExtra {
+  id          String       @id @default(cuid())
+  titulo      String
+  valor       Float // 0.1 a 0.5
+  materiaId   String
+  materia     Materia      @relation(fields: [materiaId], references: [id])
+  alunoId     String
+  aluno       User         @relation("AlunoMissoes", fields: [alunoId], references: [id])
+  status      StatusMissao @default(PENDENTE)
+  aprovadoPor String?
+  totpCode    String?
+  criadoEm    DateTime     @default(now())
+
+  @@index([alunoId, status])
+}
+
+model LogSeguranca {
+  id        String   @id @default(cuid())
+  acao      String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([acao])
+}
+
+model Config {
+  key   String @id @unique
+  value String
+}
+
+model HistoricoFinal {
+  id          String   @id @default(cuid())
+  alunoId     String
+  aluno       User     @relation(fields: [alunoId], references: [id])
+  nome        String
+  serie       Int
+  anoLetivo   Int
+  arquivadoEm DateTime @default(now())
+
+  @@index([alunoId])
+}
