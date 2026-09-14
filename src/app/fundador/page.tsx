@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { prisma } from "@/lib/prisma";
 import ImportCsvBox from "@/components/ImportCsvBox";
 import FundadorPainel from "./painel";
