@@ -22,8 +22,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Matrícula e senha são obrigatórios.");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { matricula: credentials.matricula }
+        const matriculaDigitada = credentials.matricula.trim();
+
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { matricula: matriculaDigitada },
+              { matricula: matriculaDigitada.toLowerCase() },
+              { email: matriculaDigitada },
+              { email: matriculaDigitada.toLowerCase() }
+            ]
+          }
         });
 
         if (!user || !user.ativo) {
@@ -35,8 +44,7 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Senha incorreta.");
         }
 
-        // TOTP só é exigido se o usuário já tiver configurado (staff/fundador
-        // sempre exigem; aluno comum pode não ter 2FA ativado).
+        // TOTP só é exigido se o usuário já tiver configurado
         if (user.totpSecret) {
           if (!credentials.totp) {
             throw new Error("TOTP_REQUIRED");
